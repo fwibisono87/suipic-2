@@ -1,0 +1,72 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: suipic-db
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-suipic}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-suipic}
+      POSTGRES_DB: ${POSTGRES_DB:-suipic}
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./infra/postgres/data:/var/lib/postgresql/data
+
+  minio:
+    image: minio/minio
+    container_name: suipic-storage
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-admin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-password}
+    command: server /data --console-address ":9001"
+    volumes:
+      - ./infra/minio/data:/data
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:latest
+    container_name: suipic-auth
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KC_BOOTSTRAP_ADMIN_USERNAME:-admin}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KC_BOOTSTRAP_ADMIN_PASSWORD:-admin}
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-suipic}
+      KC_DB_USERNAME: ${POSTGRES_USER:-suipic}
+      KC_DB_PASSWORD: ${POSTGRES_PASSWORD:-suipic}
+    command: start-dev
+    ports:
+      - "8080:8080"
+    depends_on:
+      - postgres
+
+  backend:
+    build:
+      context: .
+      dockerfile: ./apps/backend/Dockerfile
+    container_name: suipic-api
+    ports:
+      - "${API_PORT:-4000}:4000"
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-suipic}:${POSTGRES_PASSWORD:-suipic}@postgres:5432/${POSTGRES_DB:-suipic}?schema=public
+      MINIO_ENDPOINT: minio
+      MINIO_PORT: 9000
+    depends_on:
+      - postgres
+      - minio
+
+  frontend:
+    build:
+      context: .
+      dockerfile: ./apps/frontend/Dockerfile
+    container_name: suipic-web
+    ports:
+      - "${PORT:-3000}:3000"
+    environment:
+      VITE_API_URL: http://backend:4000
+      VITE_KEYCLOAK_URL: http://keycloak:8080
+    depends_on:
+      - backend
+      - keycloak
+
+# Root volumes section removed as host paths are used directly
