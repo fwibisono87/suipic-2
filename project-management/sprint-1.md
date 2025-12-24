@@ -12,5 +12,4 @@ Establish the core technical stack, database schema, and authentication flow.
 - [x] Implement backend authentication middleware (JWT validation).
 - [x] Implement seeded admin bootstrap.
 - [x] Set up backend testing framework (Bun.test)
-- [ ] Basic frontend routing and layout. [/]
-- [ ] Basic frontend routing and layout. [/]
+- [x] Basic frontend routing and layout.

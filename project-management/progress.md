@@ -10,8 +10,9 @@
 - [ ] Sprint 5: Dashboard & Finalization
 
 ## Current Focus
-- [Sprint 1: Foundation & Auth](file:///home/francis/code/suipic-2/project-management/sprint-1.md) [/]
-    - Basic frontend routing and layout [/]
+- [Sprint 1: Foundation & Auth](file:///home/francis/code/suipic-2/project-management/sprint-1.md) [x] 100%
+- [Sprint 2: Core Photographer Workflow](file:///home/francis/code/suipic-2/project-management/sprint-2.md) [/]
+    - S3 Bucket/MinIO Setup [/]
 
 ## Recent Updates
 - Created `project-management` directory.
