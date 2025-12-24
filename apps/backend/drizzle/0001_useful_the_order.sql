@@ -1,0 +1,2 @@
+ALTER TABLE "user_profiles" ADD COLUMN "photographer_id" uuid;--> statement-breakpoint
+ALTER TABLE "user_profiles" ADD CONSTRAINT "user_profiles_photographer_id_user_profiles_id_fk" FOREIGN KEY ("photographer_id") REFERENCES "public"."user_profiles"("id") ON DELETE no action ON UPDATE no action;

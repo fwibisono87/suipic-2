@@ -2,6 +2,7 @@ import { pgTable, uuid, varchar, timestamp, boolean, integer, jsonb, pgEnum, pri
 
 // Enums
 export const userRoleEnum = pgEnum('user_role', ['admin', 'photographer', 'client']);
+export type UserRole = 'admin' | 'photographer' | 'client';
 export const imageStatusEnum = pgEnum('image_status', ['processing', 'ready', 'failed']);
 export const feedbackFlagEnum = pgEnum('feedback_flag', ['pick', 'reject']);
 
@@ -12,6 +13,7 @@ export const userProfiles = pgTable('user_profiles', {
     email: varchar('email', { length: 255 }).notNull().unique(),
     displayName: varchar('display_name', { length: 255 }).notNull(),
     role: userRoleEnum('role').notNull(),
+    photographerId: uuid('photographer_id').references((): any => userProfiles.id),
     isActive: boolean('is_active').notNull().default(true),
     createdAt: timestamp('created_at').notNull().defaultNow(),
     modifiedAt: timestamp('modified_at').notNull().defaultNow(),

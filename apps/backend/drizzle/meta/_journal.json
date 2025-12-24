@@ -8,6 +8,13 @@
       "when": 1766588790249,
       "tag": "0000_minor_white_queen",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1766590184892,
+      "tag": "0001_useful_the_order",
+      "breakpoints": true
     }
   ]
 }
