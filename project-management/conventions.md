@@ -10,7 +10,11 @@ This document contains code conventions.
 6. true constants (that never change) should be in `SCREAMING_SNAKE_CASE`, i.e. `MAX_USERS`.
 
 
-# Frontend-specific Conventions
+# Backend-specific Conventions
+
+1. All functions and API endpoints must have corresponding tests.
+2. Use `Bun.test` for testing.
+3. Follow the Arrange-Act-Assert (AAA) pattern for test structure.
 
 1. For data fetching and mutations, use Tanstack Query.
 2. If anything might be long-running, add loading states.

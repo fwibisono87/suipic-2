@@ -11,7 +11,7 @@
 
 ## Current Focus
 - [Sprint 1: Foundation & Auth](file:///home/francis/code/suipic-2/project-management/sprint-1.md) [/]
-    - Database and Auth setup [ ]
+    - Basic frontend routing and layout [/]
 
 ## Recent Updates
 - Created `project-management` directory.
