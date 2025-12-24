@@ -8,8 +8,8 @@ dist
 
 # Data
 data/
-minio_data/
-postgres_data/
+infra/minio/data/
+infra/postgres/data/
 
 # Logs
 npm-debug.log*
