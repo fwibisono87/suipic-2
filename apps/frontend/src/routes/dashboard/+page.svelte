@@ -1,78 +1,155 @@
 <script lang="ts">
-	import { LayoutDashboard, Users, Image as ImageIcon, Camera } from 'lucide-svelte';
+	import {
+		LayoutDashboard,
+		Users,
+		Image as ImageIcon,
+		Camera,
+        Heart,
+        Star,
+        MessageSquare
+	} from "lucide-svelte";
+	import { useDashboard } from "$lib/composables/useDashboard";
+
+	const { statsQuery, activityQuery, metrics } = useDashboard();
 </script>
 
 <div class="p-8 lg:p-12 max-w-7xl mx-auto space-y-12">
-	<header class="flex flex-col md:flex-row md:items-end justify-between gap-6">
+	<header
+		class="flex flex-col md:flex-row md:items-end justify-between gap-6"
+	>
 		<div>
-			<h1 class="text-4xl lg:text-5xl font-black tracking-tighter">Dashboard</h1>
-			<p class="text-lg opacity-60 font-medium italic mt-2">Overview of your photography workspace</p>
+			<h1 class="text-4xl lg:text-5xl font-black tracking-tighter">
+				Dashboard
+			</h1>
+			<p class="text-lg opacity-60 font-medium italic mt-2">
+				Overview of your photography workspace
+			</p>
 		</div>
 		<div class="flex gap-3">
-			<button class="btn btn-primary rounded-2xl font-bold shadow-lg shadow-primary/20">
+			<a
+				href="/albums"
+				class="btn btn-primary rounded-2xl font-bold shadow-lg shadow-primary/20"
+			>
 				<Camera class="w-5 h-5 mr-2" />
 				Quick Upload
-			</button>
+			</a>
 		</div>
 	</header>
 
-	<div class="grid grid-cols-1 md:grid-cols-3 gap-8">
-		<div class="stats shadow-xl border border-base-300 rounded-3xl bg-base-100 p-4">
+	<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+		<div class="stats shadow-xl border border-base-300 rounded-3xl bg-base-100 p-2">
 			<div class="stat">
 				<div class="stat-figure text-primary">
-					<ImageIcon class="w-8 h-8" />
+					<ImageIcon class="w-8 h-8 opacity-20" />
 				</div>
-				<div class="stat-title font-bold uppercase tracking-widest text-xs opacity-50">Active Albums</div>
-				<div class="stat-value text-4xl font-black tracking-tighter mt-1">12</div>
-				<div class="stat-desc font-medium mt-1">4 pending feedback</div>
+				<div class="stat-title font-bold uppercase tracking-widest text-xs opacity-50">Albums</div>
+				<div class="stat-value text-3xl font-black mt-1">
+                    {#if statsQuery.isLoading}<span class="loading loading-dots loading-sm"></span>
+                    {:else}{metrics.totalAlbums}{/if}
+                </div>
 			</div>
 		</div>
 
-		<div class="stats shadow-xl border border-base-300 rounded-3xl bg-base-100 p-4">
+		<div class="stats shadow-xl border border-base-300 rounded-3xl bg-base-100 p-2">
 			<div class="stat">
 				<div class="stat-figure text-secondary">
-					<Users class="w-8 h-8" />
+					<Users class="w-8 h-8 opacity-20" />
 				</div>
-				<div class="stat-title font-bold uppercase tracking-widest text-xs opacity-50">Total Clients</div>
-				<div class="stat-value text-4xl font-black tracking-tighter mt-1">28</div>
-				<div class="stat-desc font-medium mt-1">2 newly joined</div>
+				<div class="stat-title font-bold uppercase tracking-widest text-xs opacity-50">Clients</div>
+				<div class="stat-value text-3xl font-black mt-1">
+                    {#if statsQuery.isLoading}<span class="loading loading-dots loading-sm"></span>
+                    {:else}{metrics.totalClients}{/if}
+                </div>
 			</div>
 		</div>
 
-		<div class="stats shadow-xl border border-base-300 rounded-3xl bg-base-100 p-4">
+        <div class="stats shadow-xl border border-base-300 rounded-3xl bg-base-100 p-2">
 			<div class="stat">
 				<div class="stat-figure text-accent">
-					<LayoutDashboard class="w-8 h-8" />
+					<Heart class="w-8 h-8 opacity-20" />
 				</div>
-				<div class="stat-title font-bold uppercase tracking-widest text-xs opacity-50">Storage Used</div>
-				<div class="stat-value text-4xl font-black tracking-tighter mt-1">4.2GB</div>
-				<div class="stat-desc font-medium mt-1">42% of 10GB tier</div>
+				<div class="stat-title font-bold uppercase tracking-widest text-xs opacity-50">Total Picks</div>
+				<div class="stat-value text-3xl font-black mt-1">
+                    {#if statsQuery.isLoading}<span class="loading loading-dots loading-sm"></span>
+                    {:else}{metrics.totalPicks}{/if}
+                </div>
+			</div>
+		</div>
+
+        <div class="stats shadow-xl border border-base-300 rounded-3xl bg-base-100 p-2">
+			<div class="stat">
+				<div class="stat-figure text-warning">
+					<Star class="w-8 h-8 opacity-20 border-warning" />
+				</div>
+				<div class="stat-title font-bold uppercase tracking-widest text-xs opacity-50">Avg Rating</div>
+				<div class="stat-value text-3xl font-black mt-1">
+                    {#if statsQuery.isLoading}<span class="loading loading-dots loading-sm"></span>
+                    {:else}{metrics.avgRating}{/if}
+                </div>
 			</div>
 		</div>
 	</div>
 
-	<section class="bg-base-100 rounded-[2.5rem] border border-base-300 shadow-2xl p-10 mt-12 overflow-hidden relative">
-		<div class="absolute top-0 right-0 w-64 h-64 bg-primary/5 rounded-full -mr-32 -mt-32 blur-3xl"></div>
+	<section
+		class="bg-base-100 rounded-[2.5rem] border border-base-300 shadow-2xl p-10 mt-12 overflow-hidden relative"
+	>
+		<div
+			class="absolute top-0 right-0 w-64 h-64 bg-primary/5 rounded-full -mr-32 -mt-32 blur-3xl"
+		></div>
 		<div class="flex items-center justify-between mb-8 relative">
-			<h2 class="text-2xl font-black tracking-tight italic">Recent Activity</h2>
-			<button class="btn btn-sm btn-ghost rounded-xl font-bold italic">See All</button>
+			<h2 class="text-2xl font-black tracking-tight italic">
+				Recent Activity
+			</h2>
+			<a
+				href="/albums"
+				class="btn btn-sm btn-ghost rounded-xl font-bold italic"
+				>See All</a
+			>
 		</div>
 
 		<div class="space-y-6 relative">
-			{#each [1, 2, 3] as i}
-				<div class="flex items-center gap-6 p-4 rounded-2xl hover:bg-base-200 transition-colors group cursor-pointer border border-transparent hover:border-base-300">
-					<div class="bg-base-300 rounded-xl w-16 h-16 flex-shrink-0 flex items-center justify-center overflow-hidden grayscale group-hover:grayscale-0 transition-all duration-500">
-						<ImageIcon class="w-6 h-6 opacity-30" />
-					</div>
-					<div class="flex-1">
-						<h3 class="font-bold tracking-tight">Album "Summer Wedding 2025"</h3>
-						<p class="text-sm opacity-60">Client <span class="font-bold text-primary">John Doe</span> added 3 comments</p>
-					</div>
-					<div class="text-right hidden sm:block">
-						<p class="text-xs font-bold uppercase tracking-widest opacity-40">2 hours ago</p>
-					</div>
+		<div class="space-y-4 relative">
+			{#if activityQuery.isLoading}
+				<div class="flex justify-center p-8">
+					<span class="loading loading-spinner text-primary"></span>
 				</div>
-			{/each}
+			{:else}
+				{#each (activityQuery.data ?? []) as item}
+					<div class="flex items-start gap-4 p-4 rounded-xl bg-base-200/50 hover:bg-base-200 transition-colors">
+                        <div class="mt-1">
+                            {#if item.type === 'comment'}
+                                <div class="bg-blue-500/10 text-blue-500 p-2 rounded-lg">
+                                    <MessageSquare class="w-5 h-5" />
+                                </div>
+                            {:else}
+                                <div class="bg-pink-500/10 text-pink-500 p-2 rounded-lg">
+                                    <Heart class="w-5 h-5" />
+                                </div>
+                            {/if}
+                        </div>
+                        <div class="flex-1">
+                             {#if item.type === 'comment'}
+                                <p class="font-bold text-sm">New Comment</p>
+                                <p class="text-sm opacity-70 line-clamp-2">"{item.data.body}"</p>
+                             {:else}
+                                <p class="font-bold text-sm">Feedback Received</p>
+                                <p class="text-sm opacity-70">
+                                    Client marked <b>{item.imageFilename || 'Image'}</b> as <span class="badge badge-sm badge-neutral">{item.data.flag}</span>
+                                    {#if item.data.rating} with {item.data.rating} stars{/if}
+                                </p>
+                             {/if}
+                             <p class="text-xs opacity-40 mt-1">{new Date(item.date).toLocaleString()}</p>
+                        </div>
+                    </div>
+				{/each}
+
+				{#if (activityQuery.data || []).length === 0}
+					<div class="text-center py-8 opacity-50 italic">
+						No recent activity.
+					</div>
+				{/if}
+			{/if}
+		</div>
 		</div>
 	</section>
 </div>

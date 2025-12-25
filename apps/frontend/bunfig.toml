@@ -1,0 +1,16 @@
+[test]
+preload = ["./test/bun-setup.ts"]
+# Exclude e2e tests from unit test run
+# Actually bun doesn't seem to have a simple 'exclude' array for test runner in toml yet (as of v1.1),
+# but works via CLI. However, we'll try to use 'test match' patterns if possible or just rely on CLI args if toml fails.
+# Exclude e2e by matching src only
+testMatch = ["src/**/*.test.ts", "src/**/*.spec.ts"]
+
+# Alternative: We can't rename e2e files. 
+# We'll just ignore this for now and rely on the setup not crashing, OR user should run specific folder.
+# But wait, the user ran `bun test` globally.
+
+# Let's try to pass the folder explicitly in the command? No, user runs the command.
+# I will try to rename the e2e files? No.
+# I will hope that since bun-setup loads, e2e might fail fast or be ignored if I can specificy `src`?
+

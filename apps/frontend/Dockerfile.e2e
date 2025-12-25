@@ -1,0 +1,14 @@
+FROM mcr.microsoft.com/playwright:v1.57.0-jammy
+
+WORKDIR /app
+
+COPY package.json bun.lock ./
+COPY --from=oven/bun:latest /usr/local/bin/bun /usr/local/bin/bun
+
+# Install dependencies including Playwright
+RUN bun install
+
+COPY . .
+
+# Run playwright test by default
+CMD ["npx", "playwright", "test"]
