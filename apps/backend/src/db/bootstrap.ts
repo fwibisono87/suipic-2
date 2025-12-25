@@ -14,11 +14,21 @@ export const bootstrap = async () => {
 
     if (!existingAdmin) {
         console.log('👤 Creating initial admin profile...');
-        // Note: In a real scenario, we'd wait for Keycloak to be ready or sync from it.
-        // For MVP, we seed a placeholder that will be linked via Keycloak ID later or updated on first login.
-        // However, Keycloak ID is NOT NULL. 
-        // Better: Synchronize on first login or use a dedicated sync script.
-        // For now, let's just log that the system is ready for Keycloak sync.
+        
+        // Seed the admin user. 
+        // Note: We generate a random UUID for keycloakId. In a real production setup, 
+        // we might ideally query Keycloak to get the real ID, or this user will be 
+        // updated with the real Keycloak ID upon first login if we implement account linking logic.
+        // For SRS compliance, we ensure an admin record exists.
+        await db.insert(userProfiles).values({
+            email: adminEmail,
+            displayName: 'System Admin',
+            role: 'admin',
+            keycloakId: crypto.randomUUID(), // Placeholder ID
+            isActive: true
+        });
+        
+        console.log(`✨ Admin seeded: ${adminEmail}`);
     }
 
     console.log('✅ Bootstrap complete.');

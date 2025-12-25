@@ -1,6 +1,6 @@
 import { db } from '../db';
-import { albums, albumClients, userProfiles } from '../db/schema';
-import { eq, and, isNull, desc } from 'drizzle-orm';
+import { albums, albumClients, userProfiles, albumPhotographers } from '../db/schema';
+import { eq, and, isNull, desc, sql } from 'drizzle-orm';
 
 export const albumService = {
     async createAlbum(data: {
@@ -25,27 +25,50 @@ export const albumService = {
     },
 
     async getAlbumForPhotographer(id: string, photographerId: string) {
-        return db.query.albums.findFirst({
+        const album = await db.query.albums.findFirst({
             where: and(
                 eq(albums.id, id), 
-                eq(albums.ownerPhotographerId, photographerId),
                 isNull(albums.deletedAt)
-            )
+            ),
+            with: {
+                clients: {
+                    with: {
+                        client: true
+                    }
+                }
+            }
         });
+
+        if (!album) return undefined;
+
+        // 1. Owner check
+        if (album.ownerPhotographerId === photographerId) return album;
+
+        // 2. Collaborator check
+        const [collaboration] = await db.select({ empty: sql`1` })
+            .from(albumPhotographers)
+            .where(and(
+                eq(albumPhotographers.albumId, id),
+                eq(albumPhotographers.photographerId, photographerId)
+            ));
+        
+        if (collaboration) return album;
+
+        return undefined;
     },
 
-    async updateAlbum(id: string, data: { title?: string; description?: string }) {
+    async updateAlbum(id: string, photographerId: string, data: { title?: string; description?: string }) {
         const [updated] = await db.update(albums)
             .set({ ...data, modifiedAt: new Date() })
-            .where(eq(albums.id, id))
+            .where(and(eq(albums.id, id), eq(albums.ownerPhotographerId, photographerId)))
             .returning();
         return updated;
     },
 
-    async softDeleteAlbum(id: string) {
+    async deleteAlbum(id: string, photographerId: string) {
         const [deleted] = await db.update(albums)
             .set({ deletedAt: new Date() })
-            .where(eq(albums.id, id))
+            .where(and(eq(albums.id, id), eq(albums.ownerPhotographerId, photographerId)))
             .returning();
         return deleted;
     },
@@ -86,5 +109,20 @@ export const albumService = {
         .where(and(eq(albumClients.clientId, clientId), isNull(albums.deletedAt)))
         // @ts-ignore
         .orderBy((t) => desc(t.createdAt)); 
+    },
+
+    async getAlbumForClient(albumId: string, clientId: string) {
+        // Verify via join
+        const result = await db.select({ id: albums.id })
+            .from(albums)
+            .innerJoin(albumClients, eq(albums.id, albumClients.albumId))
+            .where(and(
+                eq(albums.id, albumId), 
+                eq(albumClients.clientId, clientId),
+                isNull(albums.deletedAt)
+            ))
+            .limit(1);
+        
+        return result[0] || null;
     }
 };

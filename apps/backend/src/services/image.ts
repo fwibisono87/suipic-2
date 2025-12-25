@@ -20,6 +20,8 @@ export const imageService = {
             status: 'processing'
         }).returning();
 
+        if (!imageRecord) throw new Error('Failed to create image record');
+
         try {
             // 2. Extract Metadata
             const metadata = await exifr.parse(buffer).catch(() => ({}));
@@ -82,7 +84,10 @@ export const imageService = {
     async getImagesForAlbum(albumId: string) {
         const imageRecords = await db.query.images.findMany({
             where: eq(images.albumId, albumId),
-            orderBy: (images, { desc }) => [desc(images.capturedAt), desc(images.createdAt)]
+            orderBy: (images, { desc }) => [desc(images.capturedAt), desc(images.createdAt)],
+            with: {
+                feedback: true
+            }
         });
 
         // Generate Pre-signed URLs for each ready image
@@ -100,5 +105,28 @@ export const imageService = {
                 urlThumb
             };
         }));
+    },
+
+    async getImage(imageId: string) {
+        const image = await db.query.images.findFirst({
+            where: eq(images.id, imageId),
+            with: {
+                feedback: true
+            }
+        });
+
+        if (!image) return null;
+        if (image.status !== 'ready') return image;
+
+        const [urlFull, urlThumb] = await Promise.all([
+            image.storageKeyFull ? storage.getSignedUrl(image.storageKeyFull) : null,
+            image.storageKeyThumb ? storage.getSignedUrl(image.storageKeyThumb) : null
+        ]);
+
+        return {
+            ...image,
+            urlFull,
+            urlThumb
+        };
     }
 };

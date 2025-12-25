@@ -1,8 +1,8 @@
 import { pgTable, uuid, varchar, timestamp, boolean, integer, jsonb, pgEnum, primaryKey } from 'drizzle-orm/pg-core';
 
 // Enums
-export const userRoleEnum = pgEnum('user_role', ['admin', 'photographer', 'client']);
-export type UserRole = 'admin' | 'photographer' | 'client';
+export const EUserRole = pgEnum('user_role', ['admin', 'photographer', 'client']);
+export type TUserRole = 'admin' | 'photographer' | 'client';
 export const imageStatusEnum = pgEnum('image_status', ['processing', 'ready', 'failed']);
 export const feedbackFlagEnum = pgEnum('feedback_flag', ['pick', 'reject']);
 
@@ -12,7 +12,7 @@ export const userProfiles = pgTable('user_profiles', {
     keycloakId: uuid('keycloak_id').notNull().unique(),
     email: varchar('email', { length: 255 }).notNull().unique(),
     displayName: varchar('display_name', { length: 255 }).notNull(),
-    role: userRoleEnum('role').notNull(),
+    role: EUserRole('role').notNull(),
     photographerId: uuid('photographer_id').references((): any => userProfiles.id),
     isActive: boolean('is_active').notNull().default(true),
     createdAt: timestamp('created_at').notNull().defaultNow(),
@@ -90,6 +90,82 @@ export const imageFeedback = pgTable('image_feedback', {
     modifiedAt: timestamp('modified_at').notNull().defaultNow(),
 }, (t) => ({
     pk: primaryKey({ columns: [t.imageId, t.clientUserId] }),
+}));
+
+
+import { relations } from 'drizzle-orm';
+
+// Relations
+export const albumsRelations = relations(albums, ({ many, one }) => ({
+    owner: one(userProfiles, {
+        fields: [albums.ownerPhotographerId],
+        references: [userProfiles.id],
+    }),
+    images: many(images),
+    comments: many(comments),
+    clients: many(albumClients),
+    collaborators: many(albumPhotographers),
+}));
+
+export const albumPhotographersRelations = relations(albumPhotographers, ({ one }) => ({
+    album: one(albums, {
+        fields: [albumPhotographers.albumId],
+        references: [albums.id],
+    }),
+    photographer: one(userProfiles, {
+        fields: [albumPhotographers.photographerId],
+        references: [userProfiles.id],
+    }),
+}));
+
+export const albumClientsRelations = relations(albumClients, ({ one }) => ({
+    album: one(albums, {
+        fields: [albumClients.albumId],
+        references: [albums.id],
+    }),
+    client: one(userProfiles, {
+        fields: [albumClients.clientId],
+        references: [userProfiles.id],
+    }),
+}));
+
+export const imagesRelations = relations(images, ({ one, many }) => ({
+    album: one(albums, {
+        fields: [images.albumId],
+        references: [albums.id],
+    }),
+    feedback: many(imageFeedback),
+    comments: many(comments),
+}));
+
+export const imageFeedbackRelations = relations(imageFeedback, ({ one }) => ({
+    image: one(images, {
+        fields: [imageFeedback.imageId],
+        references: [images.id],
+    }),
+    client: one(userProfiles, {
+        fields: [imageFeedback.clientUserId],
+        references: [userProfiles.id],
+    }),
+}));
+
+export const commentsRelations = relations(comments, ({ one }) => ({
+    author: one(userProfiles, {
+        fields: [comments.authorUserId],
+        references: [userProfiles.id],
+    }),
+    album: one(albums, {
+        fields: [comments.albumId],
+        references: [albums.id],
+    }),
+    image: one(images, {
+        fields: [comments.imageId],
+        references: [images.id],
+    }),
+}));
+
+export const userProfilesRelations = relations(userProfiles, ({ many }) => ({ // Optional but good for completeness
+    ownedAlbums: many(albums),
 }));
 
 // Types

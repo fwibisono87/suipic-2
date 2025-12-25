@@ -2,7 +2,7 @@ import { describe, expect, it, beforeAll } from 'bun:test';
 import { albumService } from './album';
 import { userService } from './user';
 import { db } from '../db';
-import { albums } from '../db/schema';
+import { albums, albumPhotographers } from '../db/schema';
 import { eq } from 'drizzle-orm';
 
 describe('albumService', () => {
@@ -46,6 +46,7 @@ describe('albumService', () => {
             title: 'Fetch Me',
             ownerPhotographerId: photographerId
         });
+        if (!created) throw new Error('Failed to create album');
 
         const fetched = await albumService.getAlbum(created.id);
         expect(fetched).toBeDefined();
@@ -58,6 +59,7 @@ describe('albumService', () => {
             title: 'My Album',
             ownerPhotographerId: photographerId
         });
+        if (!created) throw new Error('Failed to create album');
 
         // Should find it with correct ID and owner
         const found = await albumService.getAlbumForPhotographer(created.id, photographerId);
@@ -75,8 +77,9 @@ describe('albumService', () => {
             title: 'Update Me',
             ownerPhotographerId: photographerId
         });
+        if (!created) throw new Error('Failed to create album');
 
-        const updated = await albumService.updateAlbum(created.id, {
+        const updated = await albumService.updateAlbum(created.id, photographerId, {
             title: 'Updated Title'
         });
 
@@ -88,8 +91,9 @@ describe('albumService', () => {
             title: 'Delete Me',
             ownerPhotographerId: photographerId
         });
+        if (!created) throw new Error('Failed to create album');
 
-        await albumService.softDeleteAlbum(created.id);
+        await albumService.deleteAlbum(created.id, photographerId);
 
         const fetched = await albumService.getAlbum(created.id);
         expect(fetched).toBeUndefined(); // specifically undefined because of isNull(deletedAt) check
@@ -100,6 +104,7 @@ describe('albumService', () => {
             title: 'Shared Album',
             ownerPhotographerId: photographerId
         });
+        if (!album) throw new Error('Failed to create album');
 
         const result = await albumService.addClientToAlbum(album.id, clientId);
         expect(result).toBe(true);
@@ -113,6 +118,7 @@ describe('albumService', () => {
             title: 'Unshared Album',
             ownerPhotographerId: photographerId
         });
+        if (!album) throw new Error('Failed to create album');
         await albumService.addClientToAlbum(album.id, clientId);
 
         const result = await albumService.removeClientFromAlbum(album.id, clientId);
@@ -130,10 +136,58 @@ describe('albumService', () => {
            ownerPhotographerId: photographerId
        });
        await albumService.addClientToAlbum(album.id, clientId);
+       if (!album) throw new Error('Album not created');
 
        const list = await albumService.listAlbumsForClient(clientId);
        expect(list.length).toBeGreaterThanOrEqual(1);
        if (!album) throw new Error('Album not created');
        expect(list.some(a => a.id === album.id)).toBe(true);
+   });
+
+   it('should get album for photographer (collaborator check)', async () => {
+       // Create another photographer
+       const collaborator = await userService.createProfile({
+           keycloakId: crypto.randomUUID(),
+           email: `collab-${Date.now()}@test.com`,
+           role: 'photographer'
+       });
+       const collabId = collaborator!.id;
+
+       const album = await albumService.createAlbum({
+           title: 'Collab Album',
+           ownerPhotographerId: photographerId
+       });
+
+       // Manually add as collaborator
+       await db.insert(albumPhotographers).values({
+           albumId: album.id,
+           photographerId: collabId
+       });
+
+       // Should find it
+       const found = await albumService.getAlbumForPhotographer(album.id, collabId);
+       expect(found).toBeDefined();
+       expect(found!.id).toBe(album.id);
+   });
+
+   it('should get album for client', async () => {
+       const album = await albumService.createAlbum({
+           title: 'Client View Album',
+           ownerPhotographerId: photographerId
+       });
+       await albumService.addClientToAlbum(album.id, clientId);
+
+       const found = await albumService.getAlbumForClient(album.id, clientId);
+       expect(found).toBeDefined();
+       expect(found!.id).toBe(album.id);
+       
+       // Unauthorized client
+       const other = await userService.createProfile({
+            keycloakId: crypto.randomUUID(),
+            email: `other-client-${Date.now()}@test.com`,
+            role: 'client'
+       });
+       const notFound = await albumService.getAlbumForClient(album.id, other!.id);
+       expect(notFound).toBeNull();
    });
 });

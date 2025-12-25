@@ -3,6 +3,8 @@ import {
     PutObjectCommand,
     DeleteObjectCommand,
     GetObjectCommand,
+    HeadBucketCommand,
+    CreateBucketCommand,
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 
@@ -56,8 +58,15 @@ export const storage = {
     
     // Helper to ensure bucket exists (useful for dev/bootstrap)
     async ensureBucket() {
-        // This causes cyclic dependency issues if we try to import ListBucketsCommand
-        // For MVP/Sprint 2, we assume bucket exists or use a separate script.
-        // Will implement if needed.
+        try {
+            await s3.send(new HeadBucketCommand({ Bucket: BUCKET }));
+        } catch (error: any) {
+            if (error.name === 'NotFound' || error.$metadata?.httpStatusCode === 404) {
+                console.log(`Creating bucket: ${BUCKET}`);
+                await s3.send(new CreateBucketCommand({ Bucket: BUCKET }));
+            } else {
+                throw error;
+            }
+        }
     }
 };
