@@ -8,5 +8,5 @@ Implement user creation (Admin/Photographer) and core album CRUD functionality.
 - [x] Implement User Management API (Admin creates Photographer, Admin/Photographer creates Client).
 - [x] Implement Album CRUD (Photographer creates/edits/soft-deletes).
 - [x] Implement Album Membership (Owner manages clients and collaborator photographers).
-- [ ] Frontend: User dashboard/list for Admin.
-- [ ] Frontend: Album grid and detail page for Photographer/Client.
+- [x] Frontend: User dashboard/list for Admin.
+- [x] Frontend: Album grid and detail page for Photographer/Client.

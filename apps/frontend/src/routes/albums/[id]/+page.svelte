@@ -10,7 +10,8 @@
         Star,
         XCircle,
         Filter,
-        ArrowUpDown
+        ArrowUpDown,
+        Users,
     } from "lucide-svelte";
     import { useImages } from "$lib/composables/useImages";
     import { useAlbum } from "$lib/composables/useAlbum";
@@ -29,31 +30,32 @@
     // Computed: Filtered Images
     let filteredImages = $derived.by(() => {
         if (!imagesQuery.data) return [];
-        
-        let result = [...imagesQuery.data];
+
+        let result = imagesQuery.data.pages
+            ? imagesQuery.data.pages.flat()
+            : [];
 
         // 1. Filter by Client (If selected, only considers feedback from that client)
-        // Note: Currently feedbacks are per-image. If we select a client, we might want to see images
-        // where THAT client has set a flag/rating? Or just strict filtering?
-        // SRS says: "Filter images by selected client". Usually implies "Feedback from Client X".
-        // But for "Global" view, do we hide images that Client X hasn't touched?
-        // Let's assume we filter based on if the client has ANY feedback/flag match if flag filter is active,
-        // or just show all images but focus stats on that client? 
-        // For MVP: If Client selected, we focus on THEIR feedback for the stats/icons.
-        // But SRS says "Filter images". So maybe hide images they explicitly Rejected?
-        // Let's implement: Client Selection purely filters the *Feedback* view, and maybe filters images if combined with Flag.
-        
-        if (selectedFlag !== 'all') {
-            result = result.filter(img => {
+        if (selectedFlag !== "all") {
+            result = result.filter((img) => {
                 const feedbacks = img.feedback || [];
                 // If a client is selected, look only at their feedback
-                const relevantFeedbacks = selectedClientId !== 'all' 
-                    ? feedbacks.filter(f => f.clientUserId === selectedClientId)
-                    : feedbacks;
+                const relevantFeedbacks =
+                    selectedClientId !== "all"
+                        ? feedbacks.filter(
+                              (f) => f.clientUserId === selectedClientId,
+                          )
+                        : feedbacks;
 
-                if (selectedFlag === 'pick') return relevantFeedbacks.some(f => f.flag === 'pick');
-                if (selectedFlag === 'reject') return relevantFeedbacks.some(f => f.flag === 'reject');
-                if (selectedFlag === 'none') return relevantFeedbacks.length === 0 || !relevantFeedbacks.some(f => f.flag);
+                if (selectedFlag === "pick")
+                    return relevantFeedbacks.some((f) => f.flag === "pick");
+                if (selectedFlag === "reject")
+                    return relevantFeedbacks.some((f) => f.flag === "reject");
+                if (selectedFlag === "none")
+                    return (
+                        relevantFeedbacks.length === 0 ||
+                        !relevantFeedbacks.some((f) => f.flag)
+                    );
                 return true;
             });
         }
@@ -61,22 +63,45 @@
         // 2. Sort
         result.sort((a, b) => {
             const getRating = (img: typeof a) => {
-                 const feedbacks = img.feedback || [];
-                 const relevant = selectedClientId !== 'all' ? feedbacks.filter(f => f.clientUserId === selectedClientId) : feedbacks;
-                 if (!relevant.length) return 0;
-                 return relevant.reduce((acc, curr) => acc + (curr.rating || 0), 0) / relevant.length;
+                const feedbacks = img.feedback || [];
+                const relevant =
+                    selectedClientId !== "all"
+                        ? feedbacks.filter(
+                              (f) => f.clientUserId === selectedClientId,
+                          )
+                        : feedbacks;
+                if (!relevant.length) return 0;
+                return (
+                    relevant.reduce(
+                        (acc, curr) => acc + (curr.rating || 0),
+                        0,
+                    ) / relevant.length
+                );
             };
 
             const getPicks = (img: typeof a) => {
-                 const feedbacks = img.feedback || [];
-                 const relevant = selectedClientId !== 'all' ? feedbacks.filter(f => f.clientUserId === selectedClientId) : feedbacks;
-                 return relevant.filter(f => f.flag === 'pick').length;
+                const feedbacks = img.feedback || [];
+                const relevant =
+                    selectedClientId !== "all"
+                        ? feedbacks.filter(
+                              (f) => f.clientUserId === selectedClientId,
+                          )
+                        : feedbacks;
+                return relevant.filter((f) => f.flag === "pick").length;
             };
 
-            if (sortOrder === 'date-desc') return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-            if (sortOrder === 'date-asc') return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
-            if (sortOrder === 'rating-desc') return getRating(b) - getRating(a);
-            if (sortOrder === 'picks-desc') return getPicks(b) - getPicks(a);
+            if (sortOrder === "date-desc")
+                return (
+                    new Date(b.createdAt).getTime() -
+                    new Date(a.createdAt).getTime()
+                );
+            if (sortOrder === "date-asc")
+                return (
+                    new Date(a.createdAt).getTime() -
+                    new Date(b.createdAt).getTime()
+                );
+            if (sortOrder === "rating-desc") return getRating(b) - getRating(a);
+            if (sortOrder === "picks-desc") return getPicks(b) - getPicks(a);
             return 0;
         });
 
@@ -85,19 +110,32 @@
 
     // Computed Stats
     let stats = $derived.by(() => {
-        const imgs = imagesQuery.data || [];
+        const imgs = imagesQuery.data?.pages ? imagesQuery.data.pages.flat() : [];
         // Flatten feedback based on client selection
-        const relevantFeedbacks = imgs.flatMap(i => i.feedback || []).filter(f => selectedClientId === 'all' || f.clientUserId === selectedClientId);
-        
+        const relevantFeedbacks = imgs
+            .flatMap((i) => i.feedback || [])
+            .filter(
+                (f) =>
+                    selectedClientId === "all" ||
+                    f.clientUserId === selectedClientId,
+            );
+
         return {
-            totalPicks: relevantFeedbacks.filter(f => f.flag === 'pick').length,
-            totalRejects: relevantFeedbacks.filter(f => f.flag === 'reject').length,
-            avgRating: relevantFeedbacks.filter(f => f.rating).length > 0
-                ? (relevantFeedbacks.reduce((acc, curr) => acc + (curr.rating || 0), 0) / relevantFeedbacks.filter(f => f.rating).length).toFixed(1)
-                : 'N/A'
+            totalPicks: relevantFeedbacks.filter((f) => f.flag === "pick")
+                .length,
+            totalRejects: relevantFeedbacks.filter((f) => f.flag === "reject")
+                .length,
+            avgRating:
+                relevantFeedbacks.filter((f) => f.rating).length > 0
+                    ? (
+                          relevantFeedbacks.reduce(
+                              (acc, curr) => acc + (curr.rating || 0),
+                              0,
+                          ) / relevantFeedbacks.filter((f) => f.rating).length
+                      ).toFixed(1)
+                    : "N/A",
         };
     });
-
 
     let files = $state<FileList | null>(null);
     let uploadProgress = $state<Record<string, number>>({});
@@ -135,7 +173,7 @@
 
 <div class="p-8 lg:p-12 max-w-7xl mx-auto space-y-8">
     <div
-        class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4"
+        class="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 w-full"
     >
         <div>
             <div class="text-sm breadcrumbs opacity-50 font-bold mb-2">
@@ -145,28 +183,36 @@
                 </ul>
             </div>
             <h1 class="text-4xl font-black tracking-tighter">
-                {albumQuery.data?.title || 'Loading...'}
+                {albumQuery.data?.title || "Loading..."}
             </h1>
             <p class="text-lg opacity-60 font-medium italic mt-2">
-                 {albumQuery.data?.description || `ID: ${albumId}`}
+                {albumQuery.data?.description || `ID: ${albumId}`}
             </p>
         </div>
+        <a
+            href="/albums/{albumId}/manage"
+            class="btn btn-outline btn-primary rounded-xl font-bold"
+        >
+            <Users class="w-4 h-4 mr-2" />
+            Manage Membership
+        </a>
     </div>
 
-
     <!-- Stats & Filters Toolbar -->
-    <div class="bg-base-100 p-4 rounded-2xl border border-base-300 shadow-sm space-y-4 md:space-y-0 md:flex md:items-center md:justify-between">
+    <div
+        class="bg-base-100 p-4 rounded-2xl border border-base-300 shadow-sm space-y-4 md:space-y-0 md:flex md:items-center md:justify-between"
+    >
         <!-- Stats -->
         <div class="flex gap-4 text-sm font-bold">
             <div class="flex items-center gap-2 text-primary">
                 <Heart class="w-4 h-4 fill-current" />
                 <span>{stats.totalPicks} Picks</span>
             </div>
-             <div class="flex items-center gap-2 text-error">
+            <div class="flex items-center gap-2 text-error">
                 <XCircle class="w-4 h-4" />
                 <span>{stats.totalRejects} Rejects</span>
             </div>
-             <div class="flex items-center gap-2 text-warning">
+            <div class="flex items-center gap-2 text-warning">
                 <Star class="w-4 h-4 fill-current" />
                 <span>{stats.avgRating} Avg</span>
             </div>
@@ -174,23 +220,33 @@
 
         <!-- Filters -->
         <div class="flex flex-wrap gap-2">
-             <!-- Client Filter -->
-             <div class="join">
-                <button class="join-item btn btn-sm btn-ghost px-2 pointer-events-none">
-                     <Filter class="w-4 h-4" />
+            <!-- Client Filter -->
+            <div class="join">
+                <button
+                    class="join-item btn btn-sm btn-ghost px-2 pointer-events-none"
+                >
+                    <Filter class="w-4 h-4" />
                 </button>
-                <select class="select select-bordered select-sm join-item" bind:value={selectedClientId}>
+                <select
+                    class="select select-bordered select-sm join-item"
+                    bind:value={selectedClientId}
+                >
                     <option value="all">All Clients</option>
                     {#if albumQuery.data?.clients}
                         {#each albumQuery.data.clients as c}
-                            <option value={c.client.id}>{c.client.displayName}</option>
+                            <option value={c.client.id}
+                                >{c.client.displayName}</option
+                            >
                         {/each}
                     {/if}
                 </select>
             </div>
 
             <!-- Flag Filter -->
-            <select class="select select-bordered select-sm" bind:value={selectedFlag}>
+            <select
+                class="select select-bordered select-sm"
+                bind:value={selectedFlag}
+            >
                 <option value="all">Check All</option>
                 <option value="pick">Picks Only</option>
                 <option value="reject">Rejects Only</option>
@@ -198,11 +254,16 @@
             </select>
 
             <!-- Sort -->
-             <div class="join">
-                <button class="join-item btn btn-sm btn-ghost px-2 pointer-events-none">
-                     <ArrowUpDown class="w-4 h-4" />
+            <div class="join">
+                <button
+                    class="join-item btn btn-sm btn-ghost px-2 pointer-events-none"
+                >
+                    <ArrowUpDown class="w-4 h-4" />
                 </button>
-                <select class="select select-bordered select-sm join-item" bind:value={sortOrder}>
+                <select
+                    class="select select-bordered select-sm join-item"
+                    bind:value={sortOrder}
+                >
                     <option value="date-desc">Newest First</option>
                     <option value="date-asc">Oldest First</option>
                     <option value="rating-desc">Highest Rated</option>
@@ -316,7 +377,7 @@
                 <p class="font-bold">Failed to load images</p>
             </div>
         {:else if filteredImages.length === 0}
-             <div class="col-span-full py-20 text-center opacity-50">
+            <div class="col-span-full py-20 text-center opacity-50">
                 <ImageIcon class="w-16 h-16 mx-auto mb-4 opacity-20" />
                 <p class="font-bold text-lg">No photos match filter</p>
             </div>
@@ -345,20 +406,36 @@
                     {#if img.feedback?.length}
                         <div class="absolute top-2 right-2 flex gap-1">
                             <!-- Show filtering context aware feedback if possible, or all -->
-                            {#if img.feedback.some(f => (selectedClientId === 'all' || f.clientUserId === selectedClientId) && f.flag === 'pick')}
-                                <div class="bg-primary text-primary-content p-1.5 rounded-full shadow-lg">
+                            {#if img.feedback.some((f) => (selectedClientId === "all" || f.clientUserId === selectedClientId) && f.flag === "pick")}
+                                <div
+                                    class="bg-primary text-primary-content p-1.5 rounded-full shadow-lg"
+                                >
                                     <Heart class="w-3 h-3 fill-current" />
                                 </div>
                             {/if}
-                             {#if img.feedback.some(f => (selectedClientId === 'all' || f.clientUserId === selectedClientId) && f.flag === 'reject')}
-                                <div class="bg-error text-error-content p-1.5 rounded-full shadow-lg">
+                            {#if img.feedback.some((f) => (selectedClientId === "all" || f.clientUserId === selectedClientId) && f.flag === "reject")}
+                                <div
+                                    class="bg-error text-error-content p-1.5 rounded-full shadow-lg"
+                                >
                                     <XCircle class="w-3 h-3" />
                                 </div>
                             {/if}
-                             {#if img.feedback.some(f => (selectedClientId === 'all' || f.clientUserId === selectedClientId) && f.rating)}
-                                <div class="bg-warning text-warning-content px-2 py-0.5 rounded-full shadow-lg flex items-center gap-1 text-[10px] font-bold">
+                            {#if img.feedback.some((f) => (selectedClientId === "all" || f.clientUserId === selectedClientId) && f.rating)}
+                                <div
+                                    class="bg-warning text-warning-content px-2 py-0.5 rounded-full shadow-lg flex items-center gap-1 text-[10px] font-bold"
+                                >
                                     <Star class="w-3 h-3 fill-current" />
-                                    {Math.max(...img.feedback.filter(f => selectedClientId === 'all' || f.clientUserId === selectedClientId).map(f => f.rating || 0))}
+                                    {Math.max(
+                                        ...img.feedback
+                                            .filter(
+                                                (f) =>
+                                                    selectedClientId ===
+                                                        "all" ||
+                                                    f.clientUserId ===
+                                                        selectedClientId,
+                                            )
+                                            .map((f) => f.rating || 0),
+                                    )}
                                 </div>
                             {/if}
                         </div>
@@ -380,4 +457,20 @@
             {/each}
         {/if}
     </div>
+    
+    {#if imagesQuery.hasNextPage}
+        <div class="flex justify-center pt-8">
+            <button 
+                class="btn btn-outline"
+                onclick={() => imagesQuery.fetchNextPage()}
+                disabled={imagesQuery.isFetchingNextPage}
+            >
+                {#if imagesQuery.isFetchingNextPage}
+                    <span class="loading loading-spinner"></span> Loading...
+                {:else}
+                    Load More
+                {/if}
+            </button>
+        </div>
+    {/if}
 </div>

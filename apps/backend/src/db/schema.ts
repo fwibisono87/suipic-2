@@ -3,8 +3,8 @@ import { pgTable, uuid, varchar, timestamp, boolean, integer, jsonb, pgEnum, pri
 // Enums
 export const EUserRole = pgEnum('user_role', ['admin', 'photographer', 'client']);
 export type TUserRole = 'admin' | 'photographer' | 'client';
-export const imageStatusEnum = pgEnum('image_status', ['processing', 'ready', 'failed']);
-export const feedbackFlagEnum = pgEnum('feedback_flag', ['pick', 'reject']);
+export const EImageStatus = pgEnum('image_status', ['processing', 'ready', 'failed']);
+export const EFeedbackFlag = pgEnum('feedback_flag', ['pick', 'reject']);
 
 // Tables
 export const userProfiles = pgTable('user_profiles', {
@@ -50,7 +50,7 @@ export const images = pgTable('images', {
     filename: varchar('filename', { length: 255 }).notNull(),
     title: varchar('title', { length: 255 }),
     description: varchar('description', { length: 1000 }),
-    status: imageStatusEnum('status').notNull().default('processing'),
+    status: EImageStatus('status').notNull().default('processing'),
     storageKeyFull: varchar('storage_key_full', { length: 511 }),
     storageKeyThumb: varchar('storage_key_thumb', { length: 511 }),
     
@@ -84,7 +84,7 @@ export const comments = pgTable('comments', {
 export const imageFeedback = pgTable('image_feedback', {
     imageId: uuid('image_id').notNull().references(() => images.id),
     clientUserId: uuid('client_user_id').notNull().references(() => userProfiles.id),
-    flag: feedbackFlagEnum('flag'),
+    flag: EFeedbackFlag('flag'),
     rating: integer('rating'),
     createdAt: timestamp('created_at').notNull().defaultNow(),
     modifiedAt: timestamp('modified_at').notNull().defaultNow(),

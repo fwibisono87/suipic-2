@@ -16,8 +16,11 @@ This document contains code conventions.
 2. Use `Bun.test` for testing.
 3. Follow the Arrange-Act-Assert (AAA) pattern for test structure.
 
+# Frontend-specific Conventions
+
 1. For data fetching and mutations, use Tanstack Query.
 2. If anything might be long-running, add loading states.
 3. If something is used commonnly (i.e. dialog, toast, etc), create a component and a composable.
 4. Only create custom components if DaisyUI does not have one for the purpose.
 5. Use mutation and fetch keys for efficent data.
+6. All actual http calls should be put under /services, which are called by /composables, containing Tanstack queries/mutations, which are then called by /pages.

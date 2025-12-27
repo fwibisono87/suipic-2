@@ -1,6 +1,7 @@
 import { Elysia, t } from 'elysia'
 import { cors } from '@elysiajs/cors'
 import { swagger } from '@elysiajs/swagger'
+import { rateLimit } from 'elysia-rate-limit'
 import { bootstrap } from './db/bootstrap'
 import { storage } from './services/storage';
 import { userService } from './services/user'
@@ -18,11 +19,22 @@ import { authPlugin } from './auth'
 const app = new Elysia()
     .use(cors())
     .use(swagger())
+    .use(rateLimit({
+        max: 100,
+        duration: 60000, // 1 minute
+        generator: (req, server) => {
+            // Rate limit by user ID if authenticated, else IP
+            // This is a bit tricky since auth middleware runs later in the chain
+            // But for simple IP based rate limit at top level:
+            return server?.requestIP(req)?.address || 'unknown'
+        }
+    }))
     .model({
         'user.create': t.Object({
             keycloakId: t.String({ format: 'uuid' }),
             email: t.String({ format: 'email' }),
             displayName: t.Optional(t.String()),
+            photographerId: t.Optional(t.String({ format: 'uuid' })), // Added photographerId as optional string
         }),
         'album.create': t.Object({
             title: t.String({ minLength: 1 }),
@@ -69,6 +81,43 @@ const app = new Elysia()
                     }, {
                         requireAuth: ['admin']
                     })
+                    .get('/users', async () => {
+                        return userService.listAllUsers();
+                    }, {
+                        requireAuth: ['admin']
+                    })
+                    .patch('/users/:id/status', async ({ params: { id }, body: { isActive } }) => {
+                        return userService.setUserStatus(id, isActive);
+                    }, {
+                        requireAuth: ['admin'],
+                        body: t.Object({ isActive: t.Boolean() })
+                    })
+                    // Admin Client Creation (SRS Requirement)
+                    .post('/clients', (async ({ body, user }: { body: { keycloakId: string; email: string; displayName?: string; photographerId?: string }, user: any }) => {
+                        // Admin can assign to specific photographer if provided
+                        return userService.createProfile({
+                            ...body,
+                            role: 'client',
+                            // If photographerId not provided, might be unassigned or system (logic depends on needs, allowing undefined)
+                        });
+                    }) as any, {
+                        requireAuth: ['admin'],
+                        body: 'user.create'
+                    })
+                    // Admin Album Management
+                    .get('/albums', async () => {
+                        return albumService.listAllAlbums();
+                    }, {
+                        requireAuth: ['admin']
+                    })
+                    .delete('/albums/:id', (async ({ params: { id }, error }: { params: { id: string }, error: any }) => {
+                         // Admin delete bypasses owner check (photographerId = null)
+                         const deleted = await albumService.deleteAlbum(id, null);
+                         if (!deleted) return error(404, 'Album not found');
+                         return { success: true };
+                    }) as any, {
+                        requireAuth: ['admin']
+                    })
             )
             .group('/photographer', (photo) => 
                 photo
@@ -104,7 +153,7 @@ const app = new Elysia()
                     })
                     .get('/albums/:id', (async ({ params: { id }, user, error }: { params: { id: string }, user: any, error: any }) => {
                         const album = await albumService.getAlbumForPhotographer(id, user.id);
-                        if (!album) return error(404, 'Album not found');
+                        if (!album) return error(403, 'Album access denied');
                         return album;
                     }) as any, {
                         requireAuth: ['photographer']
@@ -133,7 +182,8 @@ const app = new Elysia()
                     })
                     .post('/albums/:id/clients', (async ({ params: { id }, body, user, error }: { params: { id: string }, body: { clientId: string }, user: any, error: any }) => {
                         const existing = await albumService.getAlbumForPhotographer(id, user.id);
-                        if (!existing) return error(404, 'Album not found');
+                        if (!existing) return error(403, 'Album access denied');
+                        if (existing.ownerPhotographerId !== user.id) return error(403, 'Only owner can manage clients');
                         // Validation of client ID/role could be here, but assume valid ID
                         await albumService.addClientToAlbum(id, body.clientId);
                         return { success: true };
@@ -143,9 +193,27 @@ const app = new Elysia()
                     })
                     .delete('/albums/:id/clients/:clientId', async ({ params: { id, clientId }, user, error }: { params: { id: string, clientId: string }, user: any, error: any }) => {
                          const existing = await albumService.getAlbumForPhotographer(id, user.id);
-                         if (!existing) return error(404, 'Album not found');
+                         if (!existing) return error(403, 'Album access denied');
+                         if (existing.ownerPhotographerId !== user.id) return error(403, 'Only owner can manage clients');
                          await albumService.removeClientFromAlbum(id, clientId);
                          return { success: true };
+                    }) as any, {
+                        requireAuth: ['photographer']
+                    })
+                    .post('/albums/:id/collaborators', (async ({ params: { id }, body, user, error }: { params: { id: string }, body: { photographerId: string }, user: any, error: any }) => {
+                        const existing = await albumService.getAlbumForPhotographer(id, user.id);
+                        if (!existing || existing.ownerPhotographerId !== user.id) return error(403, 'Only owner can manage collaborators');
+                        await albumService.addCollaboratorToAlbum(id, body.photographerId);
+                        return { success: true };
+                    }) as any, {
+                        requireAuth: ['photographer'],
+                        body: t.Object({ photographerId: t.String() })
+                    })
+                    .delete('/albums/:id/collaborators/:photographerId', (async ({ params: { id, photographerId }, user, error }: { params: { id: string, photographerId: string }, user: any, error: any }) => {
+                        const existing = await albumService.getAlbumForPhotographer(id, user.id);
+                        if (!existing || existing.ownerPhotographerId !== user.id) return error(403, 'Only owner can manage collaborators');
+                        await albumService.removeCollaboratorFromAlbum(id, photographerId);
+                        return { success: true };
                     }) as any, {
                         requireAuth: ['photographer']
                     })
@@ -175,11 +243,26 @@ const app = new Elysia()
                             file: t.File()
                         })
                     })
-                    .get('/albums/:id/images', (async ({ params: { id }, user, error }: { params: { id: string }, user: any, error: any }) => {
+                    .get('/albums/:id/images', (async ({ params: { id }, query, user, error }: { params: { id: string }, query: any, user: any, error: any }) => {
                         const existing = await albumService.getAlbumForPhotographer(id, user.id);
                         if (!existing) return error(404, 'Album not found');
                         
-                        return imageService.getImagesForAlbum(id);
+                        return imageService.getImagesForAlbum(id, {
+                            clientUserId: query.clientUserId,
+                            flag: query.flag,
+                            minRating: query.minRating ? parseInt(query.minRating) : undefined,
+                            sortBy: query.sortBy,
+                            sortOrder: query.sortOrder,
+                            limit: query.limit ? parseInt(query.limit) : 50,
+                            offset: query.offset ? parseInt(query.offset) : 0
+                        });
+                    }) as any, {
+                        requireAuth: ['photographer']
+                    })
+                    .get('/albums/:id/images/:imageId', (async ({ params: { id, imageId }, user, error }: { params: { id: string, imageId: string }, user: any, error: any }) => {
+                        const existing = await albumService.getAlbumForPhotographer(id, user.id);
+                        if (!existing) return error(403, 'Album access denied');
+                        return imageService.getImage(imageId);
                     }) as any, {
                         requireAuth: ['photographer']
                     })
@@ -202,7 +285,7 @@ const app = new Elysia()
         return {
             id: user.id || user.sub,
             email: user.email,
-            role: user.realm_access?.roles.includes("app-admin") ? "admin" : "photographer"
+            role: user.realm_access?.roles.includes("admin") ? "admin" : "photographer"
         };
     })
             .group('/client', (client) => 
@@ -212,16 +295,20 @@ const app = new Elysia()
                     }) as any, {
                          requireAuth: ['client']
                     })
-                    .get('/albums/:id/images', (async ({ params: { id }, user, error }: { params: { id: string }, user: any, error: any }) => {
+                    .get('/albums/:id/images', (async ({ params: { id }, user, query, error }: { params: { id: string }, user: any, query: any, error: any }) => {
                         const allowed = await albumService.getAlbumForClient(id, user.id);
+                        if (!allowed) return error(403, 'Album access denied');
                         
-                        return imageService.getImagesForAlbum(id);
+                        return imageService.getImagesForAlbum(id, {
+                             limit: query.limit ? parseInt(query.limit) : 50,
+                             offset: query.offset ? parseInt(query.offset) : 0
+                        });
                     }) as any, {
                         requireAuth: ['client']
                     })
                     .get('/albums/:id/images/:imageId', (async ({ params: { id, imageId }, user, error }: { params: { id: string, imageId: string }, user: any, error: any }) => {
                         const allowed = await albumService.getAlbumForClient(id, user.id);
-                        if (!allowed) return error(404, 'Album not found');
+                        if (!allowed) return error(403, 'Album access denied');
 
                         const image = await imageService.getImage(imageId);
                         
@@ -266,8 +353,13 @@ const app = new Elysia()
                 }) as any, {
                     requireAuth: ['client', 'photographer']
                 })
+                .get('/albums/:id', (async ({ params: { id } }: { params: { id: string } }) => {
+                    return commentService.getCommentsForAlbum(id);
+                }) as any, {
+                    requireAuth: ['client', 'photographer']
+                })
                 .delete('/:id', (async ({ params: { id }, user }: { params: { id: string }, user: any }) => {
-                    const isAdmin = user.roles.includes('app-admin');
+                    const isAdmin = user.roles.includes('admin');
                     const role = isAdmin ? 'admin' : 'user'; 
                     return commentService.softDeleteComment(id, user.id, role);
                 }) as any, {
@@ -304,6 +396,19 @@ app.post('/test/upload', async ({ body, set }) => {
 });
 
 await bootstrap();
+
+// Scheduler for cleanup: Run every hour
+setInterval(async () => {
+    console.log('Running scheduled cleanup...');
+    try {
+        const result = await cleanupService.cleanupStuckProcessing();
+        if(result.deletedCount > 0) {
+            console.log(`Cleanup success: ${result.message}`);
+        }
+    } catch (e) {
+        console.error('Scheduled cleanup failed', e);
+    }
+}, 60 * 60 * 1000);
 
 console.log(
   `🦊 Elysia is running at ${app.server?.hostname}:${app.server?.port}`

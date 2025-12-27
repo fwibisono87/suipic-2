@@ -63,5 +63,41 @@ export const albumService = {
 
         if (!response.ok) throw new Error('Failed to delete album');
         return response.json();
+    },
+
+    async addClient(albumId: string, clientId: string): Promise<{ success: boolean }> {
+        const response = await fetchWithAuth(`${API_URL}/api/photographer/albums/${albumId}/clients`, {
+            method: 'POST',
+            body: JSON.stringify({ clientId }),
+            headers: { 'Content-Type': 'application/json' }
+        });
+        if (!response.ok) throw new Error('Failed to add client');
+        return response.json();
+    },
+
+    async removeClient(albumId: string, clientId: string): Promise<{ success: boolean }> {
+        const response = await fetchWithAuth(`${API_URL}/api/photographer/albums/${albumId}/clients/${clientId}`, {
+            method: 'DELETE'
+        });
+        if (!response.ok) throw new Error('Failed to remove client');
+        return response.json();
+    },
+
+    async addCollaborator(albumId: string, photographerId: string): Promise<{ success: boolean }> {
+        const response = await fetchWithAuth(`${API_URL}/api/photographer/albums/${albumId}/collaborators`, {
+            method: 'POST',
+            body: JSON.stringify({ photographerId }),
+            headers: { 'Content-Type': 'application/json' }
+        });
+        if (!response.ok) throw new Error('Failed to add collaborator');
+        return response.json();
+    },
+
+    async removeCollaborator(albumId: string, photographerId: string): Promise<{ success: boolean }> {
+        const response = await fetchWithAuth(`${API_URL}/api/photographer/albums/${albumId}/collaborators/${photographerId}`, {
+            method: 'DELETE'
+        });
+        if (!response.ok) throw new Error('Failed to remove collaborator');
+        return response.json();
     }
 };

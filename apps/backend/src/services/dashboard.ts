@@ -88,7 +88,6 @@ export const dashboardService = {
         
         // Flatten feedback
         const allFeedback: any[] = [];
-        messages:
         for (const img of recentFeedbackImages) {
             for (const fb of img.feedback) {
                 allFeedback.push({

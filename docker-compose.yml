@@ -44,13 +44,13 @@ services:
 
   backend:
     build:
-      context: .
-      dockerfile: ./apps/backend/Dockerfile
+      context: ./apps/backend
+      dockerfile: Dockerfile
     container_name: suipic-api
     ports:
       - "${API_PORT:-4000}:4000"
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER:-suipic}:${POSTGRES_PASSWORD:-suipic}@postgres:5432/${POSTGRES_DB:-suipic}?schema=public
+      DATABASE_URL: postgresql://${POSTGRES_USER:-suipic}:${POSTGRES_PASSWORD:-suipic}@postgres:5432/${POSTGRES_DB:-suipic}?search_path=public
       MINIO_ENDPOINT: minio
       MINIO_PORT: 9000
     depends_on:
@@ -59,8 +59,8 @@ services:
 
   frontend:
     build:
-      context: .
-      dockerfile: ./apps/frontend/Dockerfile
+      context: ./apps/frontend
+      dockerfile: Dockerfile
     container_name: suipic-web
     ports:
       - "${PORT:-3000}:3000"
@@ -70,5 +70,21 @@ services:
     depends_on:
       - backend
       - keycloak
+
+  playwright:
+    build:
+      context: ./apps/frontend
+      dockerfile: Dockerfile.e2e
+    container_name: suipic-e2e
+    environment:
+      - CI=true
+    ipc: host
+    depends_on:
+      - frontend
+    network_mode: service:frontend
+    # Mount the report directory to view it on host
+    volumes:
+      - ./apps/frontend/playwright-report:/app/playwright-report
+      - ./apps/frontend/test-results:/app/test-results
 
 # Root volumes section removed as host paths are used directly

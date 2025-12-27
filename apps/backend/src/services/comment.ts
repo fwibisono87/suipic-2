@@ -1,6 +1,6 @@
 import { db } from '../db';
 import { comments } from '../db/schema';
-import { eq, desc, isNull } from 'drizzle-orm';
+import { eq, desc, isNull, and } from 'drizzle-orm';
 
 export const commentService = {
     async createComment(data: {
@@ -10,8 +10,19 @@ export const commentService = {
         body: string;
         parentCommentId?: string;
     }) {
-        if (!data.albumId && !data.imageId) {
-            throw new Error('Comment must be attached to an album or image');
+        const hasAlbum = !!data.albumId;
+        const hasImage = !!data.imageId;
+        
+        if ((hasAlbum && hasImage) || (!hasAlbum && !hasImage)) {
+             throw new Error('Comment must be attached to EITHER an album OR an image (strictly one).');
+        }
+
+        // Validate parent comment existence if specified
+        if (data.parentCommentId) {
+            const parent = await db.query.comments.findFirst({
+                where: eq(comments.id, data.parentCommentId)
+            });
+            if (!parent) throw new Error('Parent comment not found');
         }
 
         return db.insert(comments).values(data).returning();
@@ -32,6 +43,16 @@ export const commentService = {
         });
     },
 
+    async getCommentsForAlbum(albumId: string) {
+        return db.query.comments.findMany({
+            where: and(
+                eq(comments.albumId, albumId), 
+                isNull(comments.deletedAt)
+            ),
+            orderBy: desc(comments.createdAt),
+        });
+    },
+
     async softDeleteComment(commentId: string, userId: string, userRole: string) {
         const comment = await db.query.comments.findFirst({
              where: eq(comments.id, commentId)
@@ -47,5 +68,4 @@ export const commentService = {
     }
 };
 
-// Helper for 'and' since I forgot to import it
-import { and } from 'drizzle-orm';
+

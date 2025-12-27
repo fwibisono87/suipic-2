@@ -1,22 +1,23 @@
-import { createQuery, createMutation, useQueryClient } from '@tanstack/svelte-query';
+import { createInfiniteQuery, createMutation, useQueryClient } from '@tanstack/svelte-query';
 import { imageService } from '../services/imageService';
-import type { TImage, TUserRole } from '../types';
+import { EUserRole, type TImage } from '../types';
 
-// Simple role detection or explicit passing. 
-// For now we'll require explicitly passing 'client' if needed, default to photographer.
-// In a real app we might grab this from auth store state.
-
-export function useImages(albumId: string | (() => string), role: TUserRole = 'photographer') {
+export function useImages(albumId: string | (() => string), role: EUserRole = EUserRole.PHOTOGRAPHER) {
     const client = useQueryClient();
     const getAlbumId = () => typeof albumId === 'function' ? albumId() : albumId;
 
-    const imagesQuery = createQuery(() => ({
+    const imagesQuery = createInfiniteQuery(() => ({
         queryKey: ['images', getAlbumId(), role],
-        queryFn: () => {
+        queryFn: async ({ pageParam = 0 }) => {
             const id = getAlbumId();
-            return id ? imageService.getImages(id, role) : Promise.resolve([]);
+            if (!id) return [];
+            return imageService.getImages(id, role, 50, pageParam as number);
         },
-        enabled: !!getAlbumId()
+        getNextPageParam: (lastPage: TImage[], allPages) => {
+            return lastPage.length === 50 ? allPages.length * 50 : undefined;
+        },
+        enabled: !!getAlbumId(),
+        initialPageParam: 0
     }));
 
     const uploadMutation = createMutation(() => ({

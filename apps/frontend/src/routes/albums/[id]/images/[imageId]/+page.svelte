@@ -6,8 +6,9 @@
     import { useUser } from "$lib/composables/useUser";
     import FeedbackControls from "$lib/components/FeedbackControls.svelte";
     import CommentSection from "$lib/components/CommentSection.svelte";
-    import { ChevronLeft, Info, Download } from "lucide-svelte";
-
+    import ImageMetadata from "$lib/components/ImageMetadata.svelte";
+    import { ChevronLeft, Info } from "lucide-svelte";
+    
     const albumId = $page.params.id || "";
     const imageId = $page.params.imageId || "";
 
@@ -34,6 +35,7 @@
     });
 
     let image = $derived(imageQuery.data);
+    let showMetadata = $state(false);
 </script>
 
 <div class="min-h-screen bg-base-100 pb-20">
@@ -54,13 +56,13 @@
                 {image?.filename || "Loading..."}
             </div>
             <div class="flex gap-2">
-                <button
-                    class="btn btn-ghost btn-sm btn-circle"
-                    title="Download Original"
+                <!-- Download button removed as per requirements -->
+                <button 
+                    class="btn btn-ghost btn-sm btn-circle" 
+                    class:btn-active={showMetadata}
+                    title="Info"
+                    onclick={() => showMetadata = !showMetadata}
                 >
-                    <Download class="w-4 h-4" />
-                </button>
-                <button class="btn btn-ghost btn-sm btn-circle" title="Info">
                     <Info class="w-4 h-4" />
                 </button>
             </div>
@@ -101,6 +103,13 @@
         <!-- Sidebar (Comments & Details) -->
         <div class="space-y-8">
             <div class="bg-base-100 lg:sticky lg:top-24 space-y-8">
+                
+                {#if showMetadata && image}
+                    <div class="animate-in slide-in-from-top-4 fade-in duration-300">
+                         <ImageMetadata {image} />
+                    </div>
+                {/if}
+
                 <!-- Mobile only controls if not strictly desktop -->
                 <div class="lg:hidden flex justify-center">
                     <FeedbackControls {imageId} />

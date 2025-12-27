@@ -1,73 +1,101 @@
-import { describe, expect, it, beforeAll } from 'bun:test';
+import { describe, expect, it } from 'bun:test';
 import { userService } from './user';
-import { db } from '../db';
-import { userProfiles } from '../db/schema';
-import { eq } from 'drizzle-orm';
 
 describe('userService', () => {
-    const testKeycloakId = '00000000-0000-0000-0000-000000000001';
-    const testEmail = 'test@suipic.test';
-
-    beforeAll(async () => {
-        // Cleanup test data if it exists
-        const clientEmail = 'client@suipic.test';
-        await db.delete(userProfiles).where(eq(userProfiles.email, clientEmail));
-        await db.delete(userProfiles).where(eq(userProfiles.email, testEmail));
-    });
-
     it('should create a photographer profile', async () => {
+        const keycloakId = crypto.randomUUID();
+        const email = `test-photo-${Date.now()}@example.com`;
+        
         const profile = await userService.createProfile({
-            keycloakId: testKeycloakId,
-            email: testEmail,
-            displayName: 'Test Photographer',
+            keycloakId,
+            email,
             role: 'photographer'
         });
 
         expect(profile).toBeDefined();
         if (!profile) return;
-        expect(profile.email).toBe(testEmail);
+        expect(profile.keycloakId).toBe(keycloakId);
+        expect(profile.email).toBe(email);
         expect(profile.role).toBe('photographer');
-        expect(profile.displayName).toBe('Test Photographer');
     });
 
-    it('should find a profile by keycloakId', async () => {
-        const profile = await userService.getProfileByKeycloakId(testKeycloakId);
-        expect(profile).toBeDefined();
-        expect(profile?.email).toBe(testEmail);
+    it('should create a client profile linked to a photographer', async () => {
+        // Create photographer first
+        const pKey = crypto.randomUUID();
+        const photo = await userService.createProfile({
+            keycloakId: pKey,
+            email: `p-${Date.now()}@example.com`,
+            role: 'photographer'
+        });
+        if (!photo) throw new Error('Failed to create photographer');
+
+        const clientKey = crypto.randomUUID();
+        const client = await userService.createProfile({
+            keycloakId: clientKey,
+            email: `c-${Date.now()}@example.com`,
+            role: 'client',
+            photographerId: photo.id
+        });
+
+        expect(client).toBeDefined();
+        expect(client!.photographerId).toBe(photo.id);
+    });
+
+    it('should get profile by keycloak id', async () => {
+         const key = crypto.randomUUID();
+         const email = `findme-${Date.now()}@example.com`;
+         await userService.createProfile({ keycloakId: key, email, role: 'photographer' });
+
+         const found = await userService.getProfileByKeycloakId(key);
+         expect(found).toBeDefined();
+         expect(found!.email).toBe(email);
     });
 
     it('should list photographers', async () => {
         const photographers = await userService.listPhotographers();
+        expect(Array.isArray(photographers)).toBe(true);
+        // We just created some, so length should be > 0
         expect(photographers.length).toBeGreaterThan(0);
-        expect(photographers.some(p => p.email === testEmail)).toBe(true);
-    });
-
-    it('should create a client for a photographer', async () => {
-        const photographer = await userService.getProfileByKeycloakId(testKeycloakId);
-        expect(photographer).toBeDefined();
-
-        const clientEmail = 'client@suipic.test';
-        await db.delete(userProfiles).where(eq(userProfiles.email, clientEmail));
-
-        const client = await userService.createProfile({
-            keycloakId: '00000000-0000-0000-0000-000000000002',
-            email: clientEmail,
-            role: 'client',
-            photographerId: photographer!.id
-        });
-
-        expect(client).toBeDefined();
-        if (!client) return;
-        expect(client.role).toBe('client');
-        expect(client.photographerId).toBe(photographer!.id);
+        expect(photographers.every(p => p.role === 'photographer')).toBe(true);
     });
 
     it('should list clients for a photographer', async () => {
-        const photographer = await userService.getProfileByKeycloakId(testKeycloakId);
-        expect(photographer).toBeDefined();
+        const p = await userService.createProfile({
+            keycloakId: crypto.randomUUID(),
+            email: `p-list-${Date.now()}@ex.com`,
+            role: 'photographer'
+        });
+        if (!p) throw new Error('No photo');
 
-        const clients = await userService.listClientsForPhotographer(photographer!.id);
-        expect(clients.length).toBeGreaterThan(0);
-        expect(clients[0].role).toBe('client');
+        await userService.createProfile({
+            keycloakId: crypto.randomUUID(),
+            email: `c-list-${Date.now()}@ex.com`,
+            role: 'client',
+            photographerId: p.id
+        });
+
+        const clients = await userService.listClientsForPhotographer(p.id);
+        expect(clients.length).toBeGreaterThanOrEqual(1);
+        expect(clients[0].photographerId).toBe(p.id);
+    });
+
+    it('should list all users', async () => {
+        const users = await userService.listAllUsers();
+        expect(users.length).toBeGreaterThan(0);
+    });
+
+    it('should update user status', async () => {
+        const user = await userService.createProfile({
+            keycloakId: crypto.randomUUID(),
+            email: `status-${Date.now()}@ex.com`,
+            role: 'client'
+        });
+        if (!user) throw new Error("no user");
+
+        const updated = await userService.setUserStatus(user.id, false);
+        expect(updated.isActive).toBe(false);
+
+        const updated2 = await userService.setUserStatus(user.id, true);
+        expect(updated2.isActive).toBe(true);
     });
 });

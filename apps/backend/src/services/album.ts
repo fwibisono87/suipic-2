@@ -52,25 +52,45 @@ export const albumService = {
                 eq(albumPhotographers.photographerId, photographerId)
             ));
         
-        if (collaboration) return album;
+        if (collaboration) return { ...album, role: 'collaborator' } as any;
 
         return undefined;
     },
 
-    async updateAlbum(id: string, photographerId: string, data: { title?: string; description?: string }) {
+    async updateAlbum(id: string, photographerId: string | null, data: { title?: string; description?: string }) {
+        const filters = [eq(albums.id, id)];
+        if (photographerId) {
+            filters.push(eq(albums.ownerPhotographerId, photographerId));
+        }
+
         const [updated] = await db.update(albums)
             .set({ ...data, modifiedAt: new Date() })
-            .where(and(eq(albums.id, id), eq(albums.ownerPhotographerId, photographerId)))
+            .where(and(...filters))
             .returning();
         return updated;
     },
 
-    async deleteAlbum(id: string, photographerId: string) {
+    async deleteAlbum(id: string, photographerId: string | null) {
+        const filters = [eq(albums.id, id)];
+        if (photographerId) {
+            filters.push(eq(albums.ownerPhotographerId, photographerId));
+        }
+
         const [deleted] = await db.update(albums)
             .set({ deletedAt: new Date() })
-            .where(and(eq(albums.id, id), eq(albums.ownerPhotographerId, photographerId)))
+            .where(and(...filters))
             .returning();
         return deleted;
+    },
+
+    async listAllAlbums() {
+        return db.query.albums.findMany({
+            where: isNull(albums.deletedAt),
+            orderBy: desc(albums.createdAt),
+            with: {
+                clients: true // could expand if needed
+            }
+        });
     },
 
     async addClientToAlbum(albumId: string, clientId: string) {
@@ -89,10 +109,41 @@ export const albumService = {
     },
 
     async listAlbumsForPhotographer(photographerId: string) {
-        return db.query.albums.findMany({
+        // Find owned albums
+        const owned = await db.query.albums.findMany({
             where: and(eq(albums.ownerPhotographerId, photographerId), isNull(albums.deletedAt)),
             orderBy: (albums, { desc }) => [desc(albums.createdAt)]
         });
+
+        // Find collaborator albums
+        const collaborations = await db.select({
+            id: albums.id,
+            title: albums.title,
+            description: albums.description,
+            ownerPhotographerId: albums.ownerPhotographerId,
+            createdAt: albums.createdAt,
+            modifiedAt: albums.modifiedAt
+        })
+        .from(albums)
+        .innerJoin(albumPhotographers, eq(albums.id, albumPhotographers.albumId))
+        .where(and(eq(albumPhotographers.photographerId, photographerId), isNull(albums.deletedAt)));
+
+        const all = [...owned, ...collaborations];
+        return all.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+    },
+
+    async addCollaboratorToAlbum(albumId: string, photographerId: string) {
+        await db.insert(albumPhotographers).values({
+            albumId,
+            photographerId
+        }).onConflictDoNothing();
+        return true;
+    },
+
+    async removeCollaboratorFromAlbum(albumId: string, photographerId: string) {
+        await db.delete(albumPhotographers)
+            .where(and(eq(albumPhotographers.albumId, albumId), eq(albumPhotographers.photographerId, photographerId)));
+        return true;
     },
 
     async listAlbumsForClient(clientId: string) {

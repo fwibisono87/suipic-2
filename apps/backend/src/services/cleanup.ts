@@ -1,6 +1,7 @@
 import { db } from '../db';
 import { images } from '../db/schema';
 import { eq, lt, and } from 'drizzle-orm';
+import { storage } from './storage';
 
 export const cleanupService = {
     /**
@@ -22,24 +23,43 @@ export const cleanupService = {
             return { deletedCount: 0, message: 'No stuck images found' };
         }
 
-        // Delete them from DB
-        // In a real production system, we might want to try to delete from S3 too if partial upload occurred,
-        // but for now we assume they didn't fully make it or we just clean the DB row.
-        const ids = stuckImages.map(img => img.id);
-        
-        // Batch delete is safer done individually or via 'inArray' if supported effectively,
-        // but let's loop for safety in this simple implementation or use inArray if we imported it.
-        // We'll use a loop for now to be explicit.
-        
+        // Delete them from DB and S3
         let deletedCount = 0;
         for (const img of stuckImages) {
+            // Delete from Storage if keys exist
+            if (img.storageKeyFull) {
+                try {
+                    await storage.deleteFile(img.storageKeyFull);
+                } catch (e) {
+                    console.error(`Failed to delete storageKeyFull: ${img.storageKeyFull}`, e);
+                }
+            }
+            if (img.storageKeyThumb) {
+                try {
+                    await storage.deleteFile(img.storageKeyThumb);
+                } catch (e) {
+                    console.error(`Failed to delete storageKeyThumb: ${img.storageKeyThumb}`, e);
+                }
+            }
+
+            // Cleanup temp file if it exists
+            const tempKey = `temp/${img.id}`;
+            try {
+                await storage.deleteFile(tempKey);
+            } catch (e) {
+                // Ignore errors if temp file doesn't exist (already processed or never uploaded)
+                // AccessDenied or NotFound might happen, we just log debug ideally.
+                // console.debug(`Failed to delete tempKey: ${tempKey}`, e);
+            }
+
+            // Delete from DB
             await db.delete(images).where(eq(images.id, img.id));
             deletedCount++;
         }
 
         return {
             deletedCount,
-            message: `Cleaned up ${deletedCount} stuck processing images`
+            message: `Cleaned up ${deletedCount} stuck processing images and their storage objects`
         };
     }
 };

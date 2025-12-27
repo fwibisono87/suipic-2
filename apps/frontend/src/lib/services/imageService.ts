@@ -4,10 +4,18 @@ import { fetchWithAuth } from './auth';
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000';
 
 export const imageService = {
-    async getImages(albumId: string, role: string = 'photographer'): Promise<TImage[]> {
-        const url = role === 'client' 
+    async getImages(
+        albumId: string, 
+        role: string = 'photographer', 
+        limit: number = 50, 
+        offset: number = 0
+    ): Promise<TImage[]> {
+        const baseUrl = role === 'client'
             ? `${API_URL}/api/client/albums/${albumId}/images`
-            : `${API_URL}/api/photographer/albums/${albumId}/images`; // Admin/Photographer access same logic mostly, or distinct if needed
+            : `${API_URL}/api/photographer/albums/${albumId}/images`;
+        
+        const url = `${baseUrl}?limit=${limit}&offset=${offset}`;
+
         const res = await fetchWithAuth(url);
         if (!res.ok) throw new Error('Failed to fetch images');
         return res.json();

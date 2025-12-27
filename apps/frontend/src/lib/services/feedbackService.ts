@@ -1,10 +1,10 @@
 import { fetchWithAuth } from '$lib/services/auth';
-import type { TFeedback } from '$lib/types';
+import type { TFeedback, EFeedbackFlag } from '$lib/types';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000';
 
 export const feedbackService = {
-    async upsertFeedback(imageId: string, data: { flag?: 'pick' | 'reject'; rating?: number }): Promise<TFeedback> {
+    async upsertFeedback(imageId: string, data: { flag?: EFeedbackFlag; rating?: number }): Promise<TFeedback> {
         const response = await fetchWithAuth(`${API_URL}/api/feedback/images/${imageId}`, {
             method: 'POST',
             body: JSON.stringify(data),

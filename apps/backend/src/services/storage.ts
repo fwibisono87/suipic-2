@@ -48,7 +48,21 @@ export const storage = {
         return s3.send(command);
     },
 
-    async getSignedUrl(key: string, expiresIn = 3600) {
+    async downloadFile(key: string) {
+        const command = new GetObjectCommand({
+            Bucket: BUCKET,
+            Key: key,
+        });
+        const response = await s3.send(command);
+        if (!response.Body) {
+            throw new Error(`Failed to download file: ${key}`);
+        }
+        // Transform the stream to a Buffer (Node.js compatible)
+        const byteArray = await response.Body.transformToByteArray();
+        return Buffer.from(byteArray);
+    },
+
+    async getSignedUrl(key: string, expiresIn = 300) {
         const command = new GetObjectCommand({
             Bucket: BUCKET,
             Key: key,
